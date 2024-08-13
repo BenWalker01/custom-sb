@@ -1,5 +1,6 @@
 from copy import copy
 import neat
+import pygame
 import os
 import sys
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,6 +18,10 @@ import pickle
 from Trainer_Plane import Plane
 import random
 from prettytable import PrettyTable
+
+
+WINDOW_SIZE = (800,800)
+
 
 ROUTES = [["NOVMA","OCK"],
           ["ODVIK","BIG"],
@@ -52,8 +57,27 @@ class Bot:
 
 
     def train_ai(self,genome,config): # put in main.py??
+        print("training")
+        coords = [FIXES[route[0]] for route in ROUTES]  # Replace getCoords with your actual function
+
+        # Calculate min and max values
+        min_lon = min(coord[0] for coord in coords)
+        max_lon = max(coord[0] for coord in coords)
+        min_lat = min(coord[1] for coord in coords)
+        max_lat = max(coord[1] for coord in coords)
+
+        width = util.haversine(min_lat,min_lon,min_lat,max_lon) / 1.852
+        height = util.haversine(min_lat,min_lon,max_lat,min_lon) / 1.852
+        num_boxes_lon = int(width / 0.3)
+        num_boxes_lat = int(height / 0.3)
+        print(num_boxes_lat,num_boxes_lon)
+
+        grid = [[[] for _ in range(num_boxes_lat)] for _ in range(num_boxes_lon)]
+
 
         net1 = neat.nn.FeedForwardNetwork.create(genome,config)
+
+
         route = random.choice(ROUTES)
         lat,lon = FIXES[route[0]]
         head = util.headingFromTo((lat,lon),FIXES[route[-1]])
@@ -62,8 +86,8 @@ class Bot:
         p.start_distance = abs(util.haversine(lat,lon,self.airport[0],self.airport[1]))/ 1.852
 
         loop_counter = 0 # each loop is 5s
+        print("staring")
         while self.simulating:
-            table.clear_rows()
             # run the sim and see
             if loop_counter > 16:
                 route = random.choice(ROUTES)
@@ -77,91 +101,70 @@ class Bot:
                 loop_counter = 0
 
             for plane in self.active_planes:
-                table.add_row([plane.lat, plane.lon, plane.altitude, plane.speed, plane.heading,plane.targetHeading,plane.mode])
-                dists = [(p,abs(util.haversine(p.lat,p.lon,plane.lat,plane.lon))) for p in self.active_planes]
-                dists = sorted(dists, key=lambda x: x[-1])
-                inputs = [[p.lat,p.lon,p.altitude,p.speed,p.heading] for p in self.active_planes]
-                inputs = [i for li in inputs for i in li]
-                if plane.distance_travelled > 5:
-                    input_nodes = [-1] * 57
+                box_lon = int((plane.lon - min_lon) / 0.1)
+                box_lat = int((plane.lat - min_lat) / 0.1)
 
-                    input_nodes[0] = plane.lat
-                    input_nodes[1] = plane.lon
-                    input_nodes[2] = plane.altitude
-                    input_nodes[3] = plane.speed
-                    input_nodes[4] = plane.heading
-                    input_nodes[5] = self.airport[0]
-                    input_nodes[6] = self.airport[1]
-                    input_nodes[7:] = inputs[:50]
+                grid[box_lon][box_lat].append(plane)
 
-                    input_nodes.extend([-1] *( 57 - len(input_nodes)))
+            inputs = []
+            for row in grid:
+                for box in row:
+                    inputs.append(1 if len(box) > 0 else 0)
 
-                    output = net1.activate(tuple(input_nodes)) # pop in the thingys
-                    given_inst = False
-                    
-                    if given_inst:
-                        plane.instructions += 1
+            output = net1.activate(tuple(inputs))
 
-                    heading = output[:73]
-                    heading_desc = heading.index(max(heading))
-                    if plane.targetHeading != heading_desc * 5:
-                        given_inst = True
-                    plane.targetHeading = heading_desc * 5
+            plane_select = output[:53_165]
+            plen = plane_select.index(max(plane_select))
+            row = plen // num_boxes_lon
+            col = plen % num_boxes_lon
 
-                    altitude = output[73:79]
-                    altitude_desc = altitude.index(max(altitude))
-                    if plane.altitude < (altitude_desc * 1000) + 1000:
-                        plane.climbed = True
-                    if plane.targetAltitude != (altitude_desc * 1000) + 1000:
-                        given_inst = True
-                    plane.targetAltitude = (altitude_desc * 1000) + 1000
+            try:
+                plane = random.choice(grid[row][col])
+            except IndexError as e:
+                plane = None
 
-                    if given_inst and not self.RMA_POLYGON.contains(Point(plane.lat,plane.lon)):
+            given_inst = False
+            if plane != None:
+                insts = output[-106:]
+
+                heading = insts[:71]
+                heading_desc = heading.index(max(heading))
+                if plane.targetHeading != heading_desc * 5:
+                    given_inst = True
+                plane.targetHeading = heading_desc * 5
+                
+                altitude = insts[71:79]
+                altitude_desc = altitude.index(max(altitude))
+
+                if plane.altitude < (altitude_desc * 1000) + 1000:
+                    plane.climbed = True
+                if plane.targetAltitude != (altitude_desc * 1000) + 1000:
+                    given_inst = True
+                plane.targetAltitude = (altitude_desc * 1000) + 1000
+
+                if given_inst:
+                    plane.instructions += 1
+
+                if given_inst and not self.RMA_POLYGON.contains(Point(plane.lat,plane.lon)):
                         plane.vectored_out_rma = True
 
-                    speed = output[79:105]
-                    speed_desc = speed.index(max(speed))
-                    if plane.speed < (speed_desc * 5) + 125:
-                        plane.sped_up = True
-                    plane.targetSpeed = (speed_desc * 5) + 125
-                    
-                    clapp = output[-2:]
-                    clapp_desc = clapp.index(max(clapp))
+                speed = insts[27:104]
+                speed_desc = speed.index(max(speed))
+                if plane.speed < (speed_desc * 5) + 125:
+                    plane.sped_up = True
+                plane.targetSpeed = (speed_desc * 5) + 125
+                clapp = insts[-2:]
+                clapp_desc = clapp.index(max(clapp))
 
-                    if clapp_desc == 1: # CL/APP
-                        runwayData = loadRunwayData("EGLL")["27R"] # TODO get better
-                        plane.clearedILS = runwayData
-                        plane.mode = PlaneMode.ILS
-                        plane.d_clappd = abs(util.haversine(plane.lat,plane.lon,self.airport[0],self.airport[1]))/1.852
+                if clapp_desc == 1: # CL/APP
+                    runwayData = loadRunwayData("EGLL")["27R"] # TODO get better
+                    plane.clearedILS = runwayData
+                    plane.mode = PlaneMode.ILS
+                    plane.d_clappd = abs(util.haversine(plane.lat,plane.lon,self.airport[0],self.airport[1]))/1.852
 
-                    if plane.mode == PlaneMode.HEADING:
-                        if not plane.left_rma and not self.RMA_POLYGON.contains(Point(plane.lat,plane.lon)):
-                            plane.left_rma = True
-
-                    landed = False
-                    distances = [30]
-                    if math.isclose((util.haversine(plane.lat,plane.lon,self.airport[0],self.airport[1]) / 1.852),0.1,abs_tol=0.1) and plane.altitude < 300 and plane.mode == PlaneMode.ILS:
-                        self.planes.append(plane)
-                        landed = True
-                    for p in self.active_planes:
-                        if p != plane:
-                            if landed and p.mode == PlaneMode.ILS:
-                                distances.append(abs(util.haversine(p.lat,p.lon,self.airport[0],self.airport[1])))
-
-
-                            if abs(util.haversine(p.lat,p.lon,plane.lat,plane.lon) / 1.852) < 2.5 and abs(p.altitude - plane.altitude) < 1000:
-                                plane.close_calls += 1
-
-                        if landed:
-                            plane.dist_from_behind = min(distances)
-                            try:
-                                self.active_planes.pop(self.active_planes.index(plane))
-                            except Exception as e:
-                                print(e)
-
-                        if util.haversine(plane.lat,plane.lon,self.airport[0],self.airport[1]) / 1.852 >= 60 and plane.heading != 0:
-                            self.simulating = False
-                            genome.fitness -= 100
+                if plane.mode == PlaneMode.HEADING:
+                    if not plane.left_rma and not self.RMA_POLYGON.contains(Point(plane.lat,plane.lon)):
+                        plane.left_rma = True
 
             
             for plane in self.active_planes:
@@ -180,7 +183,7 @@ class Bot:
             if self.seen_planes >= 24:
                 self.simulating = False
             
-            time.sleep(5/100)
+    
             
 
         self.planes.extend(self.active_planes.copy())
@@ -248,7 +251,7 @@ def calc_score(number,mean=12,stddev = 1):
 
 
 def eval_genomes(genomes,config):
-    
+    print("Evaluating...")
     for i, (genomes_id1,genome1) in enumerate(genomes):
         genome1.fitness = 0
         bot = Bot((51.477697222222, -0.43554333333333))
@@ -258,18 +261,146 @@ def eval_genomes(genomes,config):
 
 
 def run_neat(config):
-    p = neat.Checkpointer.restore_checkpoint("neat-checkpoint-18")
-    #p = neat.Population(config)
+    #p = neat.Checkpointer.restore_checkpoint("neat-checkpoint-99")
+    p = neat.Population(config)
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(1))
+    p.add_reporter(neat.Checkpointer(5))
 
 
-    winner = p.run(eval_genomes,50)
+    winner = p.run(eval_genomes,100)
 
     with open("best.pickle","wb") as f:
         pickle.dump(winner,f)
+
+def test_ai(net):
+    pygame.init()
+    window = pygame.display.set_mode(WINDOW_SIZE)
+    RMA = [(51.726111111111, -0.54972222222222),
+                    (51.655833333333, -0.32583333333333),
+                    (51.646111111111, 0.15166666666667),
+                    (51.505277777778, 0.055277777777778),
+                    (51.330875, 0.034811111111111),
+                    (51.305, -0.44722222222222),
+                    (51.4775, -0.46138888888889),
+                    (51.624755555556, -0.51378083333333),
+                    (51.726111111111, -0.54972222222222)]
+    given_coord = (51.477697222222, -0.43554333333333) # Replace with your actual coordinate
+
+    # Calculate min and max values
+    min_x = given_coord[0] - 1  # 60 nautical miles in latitude
+    max_x = given_coord[0] + 1
+    min_y = given_coord[1] - 60 / 38.4  # 60 nautical miles in longitude at latitude 51
+    max_y = given_coord[1] + 60 / 38.4
+
+
+    RMA = [(int(800 * (y - min_y) / (max_y - min_y)), 800 - int(800 * (x - min_x) / (max_x - min_x))) for x, y in RMA]
+    planes = []
+    route = random.choice(ROUTES)
+    lat,lon = FIXES[route[0]]
+    head = util.headingFromTo((lat,lon),FIXES[route[-1]])
+    p = Plane("TRN101",1000,8000,head,250,lat,lon,0,PlaneMode.HEADING,route[-1])
+    planes.append(p)
+
+    seen_planes = 1
+    loop_counter = 0
+    running = True
+    print("Running...")
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+
+
+        if loop_counter > 16:
+            route = random.choice(ROUTES)
+            lat,lon = FIXES[route[0]]
+            head = util.headingFromTo((lat,lon),FIXES[route[-1]])
+            p = Plane("TRN101",1000,8000,head,250,lat,lon,0,PlaneMode.HEADING,route[-1])
+            planes.append(p)
+      
+            seen_planes += 1
+            loop_counter = 0
+
+        for plane in planes:
+            dists = [(p,abs(util.haversine(p.lat,p.lon,plane.lat,plane.lon))) for p in planes]
+            dists = sorted(dists, key=lambda x: x[-1])
+            inputs = [[p.lat,p.lon,p.altitude,p.speed,p.heading] for p in planes]
+            inputs = [i for li in inputs for i in li]
+            if plane.distance_travelled > 5:
+                input_nodes = [-1] * 57
+
+                input_nodes[0] = plane.lat
+                input_nodes[1] = plane.lon
+                input_nodes[2] = plane.altitude
+                input_nodes[3] = plane.speed
+                input_nodes[4] = plane.heading
+                input_nodes[5] = given_coord[0]
+                input_nodes[6] = given_coord[1]
+                input_nodes[7:] = inputs[:50]
+
+                input_nodes.extend([-1] *( 57 - len(input_nodes)))
+
+                output = net.activate(tuple(input_nodes)) # pop in the thingys
+                
+
+                heading = output[:73]
+                heading_desc = heading.index(max(heading))
+                plane.targetHeading = heading_desc * 5
+                
+                altitude = output[73:79]
+                altitude_desc = altitude.index(max(altitude))
+                plane.targetAltitude = (altitude_desc * 1000) + 1000
+
+                speed = output[79:105]
+                speed_desc = speed.index(max(speed))
+                plane.targetSpeed = (speed_desc * 5) + 125
+                
+                clapp = output[-2:]
+                clapp_desc = clapp.index(max(clapp))
+
+                if clapp_desc == 1: # CL/APP
+                    runwayData = loadRunwayData("EGLL")["27R"] # TODO get better
+                    plane.clearedILS = runwayData
+                    plane.mode = PlaneMode.ILS
+                    plane.d_clappd = abs(util.haversine(plane.lat,plane.lon,given_coord[0],given_coord[1]))/1.852
+
+                landed = False
+                distances = [30]
+                if math.isclose((util.haversine(plane.lat,plane.lon,given_coord[0],given_coord[1]) / 1.852),0.1,abs_tol=0.1) and plane.altitude < 300 and plane.mode == PlaneMode.ILS:
+
+                    try:
+                        planes.pop(planes.index(plane))
+                    except Exception as e:
+                        print(e)
+
+        window.fill((0, 0, 0))
+        for plane in planes:
+            plane.calculatePosition()
+            plane_coord = (plane.lat, plane.lon)  # Replace with the actual attributes if different
+            plane_coord = (int(800 * (plane_coord[1] - min_y) / (max_y - min_y)), 800 - int(800 * (plane_coord[0] - min_x) / (max_x - min_x)))
+            pygame.draw.circle(window, (0, 255, 0), plane_coord, 2)  # Draw a green circle with radius 10 for the plane
+
+
+
+
+        pygame.draw.polygon(window,(255,0,0),RMA,1)
+        pygame.display.flip()
+
+    pygame.quit()
+
+
+
+
+def test_best_network(config):
+    with open("best.pickle","rb") as f:
+        winner = pickle.load(f)
+
+    winner_net = neat.nn.FeedForwardNetwork.create(winner,config)
+    test_ai(winner_net)
+
 
 
 
@@ -284,3 +415,4 @@ if __name__ == "__main__":
                          config_path)
     
     run_neat(config)
+    test_best_network(config)
