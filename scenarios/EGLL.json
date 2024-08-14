@@ -1,0 +1,80 @@
+{
+    "name": "EGLL",
+    "Arrivals": {
+        "EGLL": {
+            "Rate": 75,
+            "Routes": [
+                [
+                    "NOVMA DCT OCK",
+                    9000,
+                    "EGLL_N_APP"
+                ],
+                [
+                    "ODVIK DCT BIG",
+                    9000,
+                    "EGLL_N_APP"
+                ],
+                [
+                    "BRAIN DCT LAM",
+                    9000,
+                    "EGLL_N_APP"
+                ],
+                [
+                    "COWLY DCT BNN",
+                    9000,
+                    "EGLL_N_APP"
+                ]
+            ]
+        }
+    },
+    "Departures": {
+        "EGLL": {
+            "Rate": 90,
+            "Routes": [
+                [
+                    "MAXIT1F/27R MAXIT Y803 MID L612 BOGNA DCT HARDY M605 XIDIL",
+                    "LFPG"
+                ],
+                [
+                    "CPT3F/27R CPT Q63 SAWPE",
+                    "EGGD"
+                ],
+                [
+                    "GOGSI2F/27R GOGSI N621 SAM DCT GIBSO",
+                    "EGTE"
+                ],
+                [
+                    "DET2F/27R L6 DVR UL9 KONAN",
+                    "EHAM"
+                ],
+                [
+                    "UMLAT1F/27R UMLAT T418 WELIN T420 ELVOS",
+                    "EGCC"
+                ],
+                [
+                    "BPK7F/27R BPK Q295 BRAIN M197 REDFA",
+                    "EHAM"
+                ]
+            ]
+        }
+    },
+    "constants": {
+        "ACTIVE_AERODROMES": [
+            "EGLL"
+        ],
+        "ACTIVE_RUNWAYS": {
+            "EGLL": "27R"
+        },
+        "ACTIVE_CONTROLLERS": [
+            "EGLL_N_APP",
+            "EGLL_S_APP",
+            "EGLL_F_APP"
+        ],
+        "MASTER_CONTROLLER": "LON_D_CTR",
+        "MASTER_CONTROLLER_FREQ": "34905",
+        "OTHER_CONTROLLERS": {
+            "LON_S_CTR": "29430",
+            "LON_D_CTR": "34905"
+        }
+    }
+}
