@@ -1677,8 +1677,8 @@ def main():
     ], withMaster=True)
 
     stdTransit(masterCallsign, controllerSock, 400, [ # crossing traffic into Galloway
-        ["EIDW", "EGPF", 15000, 22000, "ROTEV P600 BLACA BLACA1G", "STC_CTR"],
-        ["EIDW", "EGPH", 17000, 22000, "ROTEV P600 TUNSO TUNSO1E", "STC_CTR"],
+        ["EIDW", "EGPF", 15000, 22000, "ROTEV P600 BLACA BLACA1G", "STC_W_CTR"],
+        ["EIDW", "EGPH", 17000, 22000, "ROTEV P600 TUNSO TUNSO1E", "STC_W_CTR"],
     ], withMaster=True)
     
     stdTransit(masterCallsign, controllerSock, 260, [ # leeds climbers
@@ -1688,15 +1688,15 @@ def main():
     ], withMaster=True)
 
     stdTransit(masterCallsign, controllerSock, 220, [ # stream from the south
-        ["EGLL", "EGPH", 26000, 38000, "ABEVI DCT INPIP INPIP1E", "STC_CTR"],
-        ["EGLL", "EGPF", 26000, 38000, "NELSA DCT RIBEL RIBEL1G", "STC_CTR"],
-        ["EGLL", "EGPF", 26000, 38000, "NELSA DCT RIBEL RIBEL2P", "STC_CTR"]
+        ["EGLL", "EGPH", 26000, 38000, "ABEVI DCT INPIP INPIP1E", "STC_E_CTR"],
+        ["EGLL", "EGPF", 26000, 38000, "NELSA DCT RIBEL RIBEL1G", "STC_E_CTR"],
+        ["EGLL", "EGPK", 26000, 38000, "NELSA DCT RIBEL RIBEL2P", "STC_E_CTR"]
     ], withMaster=True)
 
     stdTransit(masterCallsign, controllerSock, 220, [ # stream to merge
-        ["EHAM", "EGPH", 26000, 38000, "NATEB DCT AGPED AGPED1E", "STC_CTR"],
-        ["EHAM", "EGPF", 26000, 38000, "NATEB DCT AGPED AGPED1G", "STC_CTR"],
-        ["EHAM", "EGPF", 26000, 38000, "NATEB DCT AGPED AGPED1G", "STC_CTR"],
+        ["EHAM", "EGPH", 26000, 38000, "NATEB DCT AGPED AGPED1E", "STC_E_CTR"],
+        ["EHAM", "EGPF", 26000, 38000, "NATEB DCT AGPED AGPED1G", "STC_E_CTR"],
+        ["EHAM", "EGPF", 26000, 38000, "NATEB DCT AGPED AGPED1G", "STC_E_CTR"],
     ], withMaster=True)
 
     
