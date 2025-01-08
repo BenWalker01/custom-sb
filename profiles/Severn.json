@@ -1,0 +1,134 @@
+{
+    "stdDepartures": [
+        {
+            "departing": "EGFF",
+            "interval": 180,
+            "routes": [
+                {
+                    "route": "EXMOR1B/12 EXMOR N92 DAWLY DCT JOZMA DCT GAPLI",
+                    "arriving": "KJFK"
+                },
+                {
+                    "route": "BCN1B/12 BCN P4 FELCA DCT NICXI DCT OFSOX DCT ENJEX",
+                    "arriving": "KJFK"
+                },
+                {
+                    "route": "BCN1B/12 BCN P69 DIZIM N864 AVTIC N38 NOKIN P17 POL N601 INPIP",
+                    "arriving": "EGPH"
+                },
+                {
+                    "route": "LEKCI1B/12 LEKCI P4 HAWFA L607 KONAN",
+                    "arriving": "EHAM"
+                }
+            ]
+        },
+        {
+            "departing": "EGGD",
+            "interval": 180,
+            "routes": [
+                {
+                    "route": "EXMOR1Z/09 EXMOR N92 DAWLY DCT JOZMA DCT GAPLI",
+                    "arriving": "KJFK"
+                },
+                {
+                    "route": "BCN1Z/09 BCN P4 FELCA DCT NICXI DCT OFSOX DCT ENJEX",
+                    "arriving": "KJFK"
+                },
+                {
+                    "route": "BCN1Z/09 BCN P69 DIZIM N864 AVTIC N38 NOKIN P17 POL N601 INPIP",
+                    "arriving": "EGPH"
+                },
+                {
+                    "route": "YORQI1Z/09 YORQI L607 BIG L9 KONAN",
+                    "arriving": "EHAM"
+                }
+            ]
+        }
+    ],
+    "stdTransits": [
+        {
+            "interval": 300,
+            "routes": [
+                {
+                    "departing": "EIDW",
+                    "arriving": "EGFF",
+                    "currentLevel": 17000,
+                    "cruiseLevel": 32000,
+                    "route": "AGCAT DCT BAJJA BAJJA1C",
+                    "firstController": "EGFF_APP"
+                },
+                {
+                    "departing": "EIDW",
+                    "arriving": "EGGD",
+                    "currentLevel": 17000,
+                    "cruiseLevel": 32000,
+                    "route": "AGCAT DCT BAJJA BAJJA1B",
+                    "firstController": "EGFF_APP"
+                }
+            ]
+        },
+        {
+            "interval": 300,
+            "routes": [
+                {
+                    "departing": "EGCC",
+                    "arriving": "EGGD",
+                    "currentLevel": 16000,
+                    "cruiseLevel": 32000,
+                    "route": "RUMKE DCT WEVBE WEVBE1B",
+                    "firstController": "EGFF_APP"
+                },
+                {
+                    "departing": "EGCC",
+                    "arriving": "EGFF",
+                    "currentLevel": 16000,
+                    "cruiseLevel": 32000,
+                    "route": "RUMKE DCT WEVBE WEVBE1C",
+                    "firstController": "EGFF_APP"
+                }
+            ]
+        },
+        {
+            "interval": 300,
+            "routes": [
+                {
+                    "departing": "LEPA",
+                    "arriving": "EGFF",
+                    "currentLevel": 17000,
+                    "cruiseLevel": 32000,
+                    "route": "FIMCA DCT TOJAQ TOJAQ1C",
+                    "firstController": "EGFF_APP"
+                },
+                {
+                    "departing": "LEPA",
+                    "arriving": "EGGD",
+                    "currentLevel": 17000,
+                    "cruiseLevel": 32000,
+                    "route": "FIMCA DCT TOJAQ TOJAQ1B",
+                    "firstController": "EGFF_APP"
+                }
+            ]
+        },
+        {
+            "interval": 300,
+            "routes": [
+                {
+                    "departing": "EGKK",
+                    "arriving": "EGFF",
+                    "currentLevel": 12000,
+                    "cruiseLevel": 32000,
+                    "route": "ICTAM DCT SAWPE DCT CONKO DCT OCTIZ DCT BRI DCT CDF",
+                    "firstController": "EGGD_APP"
+                },
+                {
+                    "departing": "EGKK",
+                    "arriving": "EGGD",
+                    "currentLevel": 10000,
+                    "cruiseLevel": 32000,
+                    "route": "ICTAM DCT SAWPE DCT ASHUM DCT POMAX DCT BRI",
+                    "firstController": "EGGD_APP"
+                }
+            ]
+        }
+    ]
+}

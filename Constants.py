@@ -12,11 +12,11 @@ RADAR_UPDATE_RATE = 5 / timeMultiplier  # seconds
 
 CCAMS_SQUAWKS = list(range(201,277)) + list(range(301,377)) + list(range(470,477)) + list(range(501,577)) + list(range(730,767)) + list(range(1070,1077)) + list(range(1140,1176)) + list(range(1410,1477)) + list(range(2001,2077)) + list(range(2150,2177)) + list(range(2201,2277)) + list(range(2701,2737)) + list(range(3201,3277)) + list(range(3370,3377)) + list(range(3401,3477)) + list(range(3510,3537)) + list(range(4215,4247)) + list(range(4430,4477)) + list(range(4701,4777)) + list(range(5013,5017)) + list(range(5201,5270)) + list(range(5401,5477)) + list(range(5660,5664)) + list(range(5565,5676)) + list(range(6201,6257)) + list(range(6301,6377)) + list(range(6460,6467)) + list(range(6470,6477)) + list(range(7014,7017)) + list(range(7020,7027)) + list(range(7201,7267)) + list(range(7270,7277)) + list(range(7301,7327)) + list(range(7501,7507)) + list(range(7536,7537)) + list(range(7570,7577)) + list(range(7601,7617)) + list(range(7620,7677)) + list(range(7701,7775)) + list(range(1250,1257)) + list(range(6001,6037))
 
-ACTIVE_AERODROMES = ["EGNX", "EGBB", "EGSS", "EGGW", "EGSS", "EGLC", "EGLL"]
-ACTIVE_RUNWAYS = {"EGNX" :"27", "EGBB" : "15", "EGSS": "22", "EGGW" : "25", "EGLC" : "27", "EGLL" : "27R"}
-ACTIVE_CONTROLLERS = ["LTC_M_CTR", "LTC_MW_CTR"]
-MASTER_CONTROLLER = "LON_M_CTR"
-MASTER_CONTROLLER_FREQ = "35855"
+# ACTIVE_AERODROMES = ["EGNX", "EGBB", "EGSS", "EGGW", "EGSS", "EGLC", "EGLL"]
+# ACTIVE_RUNWAYS = {"EGNX" :"27", "EGBB" : "15", "EGSS": "22", "EGGW" : "25", "EGLC" : "27", "EGLL" : "27R"}
+# ACTIVE_CONTROLLERS = ["LTC_M_CTR", "LTC_MW_CTR"]
+# MASTER_CONTROLLER = "LON_M_CTR"
+# MASTER_CONTROLLER_FREQ = "35855"
 
 # ACTIVE_AERODROMES = ["EGLL", "EGKK", "EGLC", "EGSS", "EGGW"]
 # ACTIVE_RUNWAYS = {"EGLL": "27R", "EGKK": "26L", "EGLC": "27", "EGSS": "22", "EGGW": "25"}
@@ -133,11 +133,11 @@ MASTER_CONTROLLER_FREQ = "35855"
 # MASTER_CONTROLLER = "LON_M_CTR"
 # MASTER_CONTROLLER_FREQ = "20025"
 
-# ACTIVE_AERODROMES = ["EGFF", "EGGD"]
-# ACTIVE_RUNWAYS = {"EGFF": "12", "EGGD": "09"}
-# ACTIVE_CONTROLLERS = ["LON_W_CTR", "LON_WB_CTR", "EGFF_APP", "EGGD_APP"]
-# MASTER_CONTROLLER = "LON_M_CTR"
-# MASTER_CONTROLLER_FREQ = "20025"
+ACTIVE_AERODROMES = ["EGFF", "EGGD"]
+ACTIVE_RUNWAYS = {"EGFF": "12", "EGGD": "09"}
+ACTIVE_CONTROLLERS = ["EGFF_APP", "EGGD_APP"]
+MASTER_CONTROLLER = "LON_W_CTR"
+MASTER_CONTROLLER_FREQ = "26080"
 
 # ACTIVE_AERODROMES = ["EGNT", "EGNV"]
 # ACTIVE_RUNWAYS = {"EGNT": "07", "EGNV": "05"}
@@ -215,10 +215,10 @@ OTHER_CONTROLLERS = [
     ("EHAA_W_CTR", "25750"),
     ("EISN_CTR", "34260"),
 
-    # ("LON_W_CTR", "26080"),
+    ("LON_W_CTR", "26080"),
     # ("LON_E_CTR", "18480"),
-    ("LON_M_CTR", "20025"),
-    ("LON_D_CTR", "34905"),
+    # ("LON_M_CTR", "20025"),
+    # ("LON_D_CTR", "34905"),
     # ("LON_NW_CTR", "35580"),
     # ("LON_NE_CTR", "28130"),
     # ("LON_S_CTR", "29430"),
@@ -230,18 +230,18 @@ OTHER_CONTROLLERS = [
     # ("LTC_SE_CTR", "20530"),
     # ("LTC_SW_CTR", "33180"),
 
-    ("MAN_WU_CTR", "18780"),
-    ("MAN_NE_CTR", "35715"),
-    ("MAN_SE_CTR", "34430"),
+    # ("MAN_WU_CTR", "18780"),
+    # ("MAN_NE_CTR", "35715"),
+    # ("MAN_SE_CTR", "34430"),
     # ("MAN_W_CTR", "28055"),
 
-    ("SCO_D_CTR", "35855"),
-    # ("SCO_N_CTR", "29225"),
-    ("SCO_R_CTR", "29100"),
-    ("SCO_S_CTR", "34755"),
-    ("SCO_W_CTR", "32730"),
+    # ("SCO_D_CTR", "35855"),
+    # # ("SCO_N_CTR", "29225"),
+    # ("SCO_R_CTR", "29100"),
+    # ("SCO_S_CTR", "34755"),
+    # ("SCO_W_CTR", "32730"),
 
-    ("STC_A_CTR", "23775"),
+    # ("STC_A_CTR", "23775"),
     # ("STC_W_CTR", "24825"),
     # ("STC_E_CTR", "30975")
 ]
@@ -335,6 +335,7 @@ AIRPORT_ELEVATIONS = {
     "EGNT": 266,
     "EGMC": 49, 
     "EGNM": 681,
+    "EGFF": 220
 }
 
 

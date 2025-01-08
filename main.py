@@ -1588,7 +1588,7 @@ def main():
     # ], withMaster=True)
 
 
-    with open(f"profiles/TC Midlands.json") as f:
+    with open(f"profiles/Severn.json") as f:
         data = json.load(f)
 
     if "stdDepartures" in data.keys():
