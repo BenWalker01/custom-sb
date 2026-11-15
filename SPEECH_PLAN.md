@@ -124,9 +124,10 @@ Define a small schema with a protocol version, authenticated session,
 controller identity derived by the host, session generation, unique
 utterance ID, and message type. Support readiness/mode negotiation, a context
 snapshot request, final transcript submission, and command outcome/readback.
-An outcome should contain the utterance ID, status (`applied`, `rejected`, or
-`ambiguous`), recognized text, interpreted instruction(s), explanatory reason
-when needed, and readback text only for what was actually applied.
+An outcome should contain the utterance ID, status (`applied`,
+`partially_applied`, `rejected`, or `ambiguous`), recognized text, interpreted
+instruction(s), explanatory reason and unparsed remainder when needed, and
+readback text only for what was actually applied.
 
 Use bounded queues, explicit overload errors, and per-session ordering so
 back-to-back utterances cannot overtake one another. Deduplicate IDs on the
@@ -151,11 +152,12 @@ safe.
    callers should use the same validation/application path while retaining
    their current behavior in tag mode. Keep admin commands separate.
 3. Validate complete arguments and aircraft state before mutation; avoid
-   success-shaped responses from the current exception handlers. A compound
-   transmission needs an explicit policy: validate the whole set before
-   applying it, or report exactly which parts were applied. Prefer atomic
-   application; reject unsupported or ambiguous parts rather than silently
-   executing a subset.
+   success-shaped responses from the current exception handlers. For a compound
+   transmission, keep complete recognized instructions before the first
+   unrecognized or invalid remainder, even if it might qualify an instruction.
+   Revalidate each before applying, report exactly what was applied and expose
+   the unparsed remainder. Do not guess the callsign or skip unknown words to
+   execute later instructions.
 4. Serialize incoming speech requests onto the simulation's state-owning
    execution path. Rework the blocking loop/wakeup and shared timer mutations
    as needed so command handling does not wait a full radar interval or race
@@ -216,15 +218,14 @@ safe.
    phonetics and numbers; resolve against eligible aircraft and route/runway
    context; produce typed candidates rather than guessing strings for
    `parseCommand`. Preserve the original transcript for diagnostics.
-2. Start with a defined, testable subset: climb/descend flight level, left/right
-   heading, speed, direct/resume own navigation, squawk, hold and ILS where
-   existing simulator semantics support them. Explicitly reject unsupported
-   altitude units, runway choices, commands and combinations. Expand to STAR,
-   ground and other `commandSpec.txt`/`parseCommand` operations in later
-   increments, after their existing semantics and validation are understood.
-   Map flight levels to the current hundreds-of-feet representation
-   deliberately; distinguish heading direction, digit sequences and squawk
-   leading zeroes.
+2. Start with climb/descend to flight level or altitude, left/right headings,
+   speed and ILS. Speed proposals may specify knots or Mach and inclusive
+   minimum/maximum limits, optionally until a specified distance from the ILS.
+   The host must implement and validate those restrictions and resolve the
+   relevant ILS before applying them; a bound is not an exact target speed.
+   Reject unsupported units and runway choices. Map flight levels to the
+   current hundreds-of-feet representation deliberately and retain heading
+   direction and digit sequences.
 3. Never guess a missing digit, callsign, fix or action. On ambiguity or
    invalid state, return a visible rejection/request for repetition or an
    explicit confirmation flow; do not mutate a plane or play a success

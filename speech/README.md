@@ -1,8 +1,94 @@
 # Standalone STT experiment
 
-This prototype only displays raw transcripts. It does not connect to
-`client.py`, send network traffic, interpret instructions, change aircraft,
-suppress tags, or generate readbacks. Do not use it for real aviation.
+The standalone CLI displays raw transcripts. A separate Python API can propose
+structured instructions from a transcript, but does not connect to `client.py`,
+send network traffic, change aircraft, suppress tags, or generate readbacks.
+Do not use it for real aviation.
+
+## Python instruction proposals
+
+`speech.instructions.transcribe_instruction` accepts an existing `WhisperWorker`
+and an `Utterance`, plus aircraft callsigns and an ICAO-prefix-to-spoken-name
+mapping supplied by the caller:
+
+```python
+from speech.instructions import transcribe_instruction
+from speech.stt import WhisperWorker, load_wav
+
+worker = WhisperWorker("path/to/stt-worker", "path/to/model.bin", backend="auto")
+try:
+    job = load_wav("path/to/recording.wav", "")
+    result = transcribe_instruction(worker, job, ["RYR12T"], {"RYR": "Ryanair"})
+    print(result)
+finally:
+    worker.close()
+```
+
+`interpret_transcript(job.id, text, aircraft, airlines)` offers the same
+conversion when a transcript is already available. For microphone users,
+`run_microphone(worker, args, on_transcript=callback)` invokes
+`callback(job, text)` on the serial decoder thread; the callback can call
+`interpret_transcript`. It should hand off results quickly and must not mutate
+simulator state. A callback error stops decoding and is reported.
+`transcribe_instruction` copies the supplied aircraft and airline mappings
+before inference; callers needing PTT-press context must capture that snapshot
+themselves before submitting the utterance.
+
+An optional `greetings=["London control hello"]` argument to either API permits
+that exact greeting between a callsign and an instruction. Greetings are not
+ignored by default, and unconfigured wording is rejected. Aircraft and spoken
+airline names must still be supplied explicitly; for example, matching “Easy
+one two three tango” requires an aircraft such as `EZY123T` and a matching
+spoken name such as `{"EZY": "Easy"}`. This mapping is only an example of a
+transcript alias, not proof of what was spoken.
+
+The immutable `TranscriptResult` contains `utterance_id`, the unmodified
+`transcript`, `status`, `callsign`, `instructions`, `reason`, and `unparsed`.
+Status is `proposed`, `partial`, `rejected`, or `ambiguous`; rejections and
+ambiguities contain no instructions. A `partial` result contains the complete
+recognized instructions before the first unsupported or invalid part, plus
+the normalized unparsed remainder and an explanatory reason. It does not skip
+over unknown words to find later commands. Each `Instruction` has an `action`,
+`value`, `direction`, `unit`, `comparison`, and `until`. Speed `comparison`
+is `at_most` for “or less”, `at_least` for “or greater”, or `None` for an
+exact speed; these limits are inclusive. Unspecified speed units mean knots.
+Mach values are decimal strings, such as `"0.78"`, to preserve their value.
+“Until 4 DME” sets `until` to `DmeTermination(distance_nm=4, reference="ils")`;
+it does not identify a particular runway or ILS facility. An ILS proposal with
+no spoken runway has `value=None`; it does not
+identify or authorize a runway. A “fly heading” instruction without a stated
+turn direction has `direction=None`; the API does not choose a turn direction.
+If the callsign is ambiguous or the first instruction cannot be understood,
+the result contains no instructions. A partial result can omit words that
+would have changed the meaning of its recognized prefix; it is not proof of
+the full intended instruction.
+
+The current deliberately restricted grammar accepts an exact supplied
+callsign followed by flight-level climb/descend (including `FL150`), altitude
+climb/descend in feet, left/right heading (including “left heading”), speed,
+and ILS clearance. For example: “Ryanair one
+two tango, turn right heading zero niner zero, descend flight level one two
+zero and speed 210 knots.” Speeds accept knots, `kt`, `kts`, and Mach values
+such as “Mach point seven eight” or “Mach .78 or greater”, optionally followed
+by “until 4 DME”. Altitudes accept `ft` as well as `feet`. Digits can
+be a written number or separately spoken
+digits; single digits separated by hyphens, such as `7-0`, are also treated as
+a digit sequence. Altitude also accepts forms such as “three thousand five hundred
+feet”. Runway sides accept left, right, and centre. Other wording, including
+number words such as “twenty”, may be rejected. Callsigns must have a
+three-letter ICAO prefix, digits, and optional letter suffix. Exact ICAO
+callsigns such as `EZY123` and `BAW 223` need no spoken airline mapping.
+Airline-name callsigns require an explicit mapping. Hints passed to the CLI
+are not an aircraft mapping.
+
+These are **proposals**, not verified clearances. Recognition can hallucinate
+or mishear even an apparently valid instruction. A simulator must independently
+resolve and revalidate the aircraft, authorization, proposed commands, values,
+runway and live state before applying anything; it must report any unparsed
+remainder and exactly what was applied. The simulator currently does not
+enforce Mach bounds or ILS DME restrictions; it must implement and validate
+those semantics rather than treating a bound as an exact speed. This API does not
+implement that integration or provide an aircraft context snapshot.
 
 ## Build
 

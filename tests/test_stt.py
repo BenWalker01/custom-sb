@@ -138,6 +138,7 @@ class WavTests(unittest.TestCase):
 class MicrophoneTests(unittest.TestCase):
     def test_ptt_captures_preroll_and_decodes_on_release(self):
         captured = []
+        delivered = []
         key = object()
 
         class FakeStream:
@@ -185,10 +186,20 @@ class MicrophoneTests(unittest.TestCase):
         args = types.SimpleNamespace(key="f8", preroll_ms=1, max_seconds=1, prompt="hint", device=None, save_wav_dir=None)
         with patch.dict("sys.modules", {"sounddevice": sd, "pynput": pynput}), redirect_stdout(io.StringIO()):
             with self.assertRaisesRegex(RuntimeError, "listener stopped"):
-                run_microphone(FakeWorker(), args)
+                run_microphone(FakeWorker(), args, lambda job, text: delivered.append((job, text)))
         self.assertEqual(len(captured), 1)
         self.assertEqual(captured[0].pcm, b"\x01\x00" * 16 + b"\x02\x00" * 2)
         self.assertEqual(captured[0].prompt, "hint")
+        self.assertEqual(delivered, [(captured[0], "example")])
+
+        def fail_callback(job, text):
+            raise ValueError("consumer failed")
+
+        output = io.StringIO()
+        with patch.dict("sys.modules", {"sounddevice": sd, "pynput": pynput}), redirect_stdout(output):
+            with self.assertRaises(RuntimeError):
+                run_microphone(FakeWorker(), args, fail_callback)
+        self.assertIn("ERROR delivering transcript: consumer failed", output.getvalue())
 
 
 @unittest.skipUnless(

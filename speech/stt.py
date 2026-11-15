@@ -204,7 +204,8 @@ def save_wav(directory, utterance):
     return path
 
 
-def run_microphone(worker, args):
+def run_microphone(worker, args, on_transcript=None):
+    """Capture PTT audio; optionally deliver each transcript on the decoder thread."""
     try:
         import sounddevice as sd
         from pynput import keyboard
@@ -217,6 +218,7 @@ def run_microphone(worker, args):
     capture = Capture(args.preroll_ms, args.max_seconds)
     jobs = queue.Queue(maxsize=2)
     results = queue.Queue()
+    callback_errors = queue.Queue(maxsize=1)
 
     def decode():
         while True:
@@ -233,9 +235,17 @@ def run_microphone(worker, args):
             started = time.monotonic()
             try:
                 text = worker.transcribe(job)
-                results.put(f"[{job.id}] {text.strip()} (queue {queue_wait:.2f}s, inference {time.monotonic() - started:.2f}s, total {time.monotonic() - job.released_at:.2f}s)")
             except (OSError, RuntimeError, ValueError) as exc:
                 results.put(f"[{job.id}] ERROR: {exc}")
+                continue
+            if on_transcript is not None:
+                try:
+                    on_transcript(job, text)
+                except Exception as exc:
+                    callback_errors.put(exc)
+                    results.put(f"[{job.id}] ERROR delivering transcript: {exc}")
+                    return
+            results.put(f"[{job.id}] {text.strip()} (queue {queue_wait:.2f}s, inference {time.monotonic() - started:.2f}s, total {time.monotonic() - job.released_at:.2f}s)")
 
     def callback(indata, frames, timing, status):
         if sys.byteorder != "little":
@@ -268,6 +278,8 @@ def run_microphone(worker, args):
                 with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
                     print(f"Hold {args.key} to record; release to transcribe. Ctrl+C to exit.", flush=True)
                     while listener.is_alive():
+                        if not callback_errors.empty():
+                            raise RuntimeError("Transcript callback failed") from callback_errors.get_nowait()
                         if not stream.active:
                             raise RuntimeError("Microphone stream stopped unexpectedly")
                         error = capture.take_device_error()
@@ -281,7 +293,12 @@ def run_microphone(worker, args):
         except sd.PortAudioError as exc:
             raise RuntimeError(f"Microphone unavailable: {exc}") from exc
     finally:
-        jobs.put(None)
+        while thread.is_alive():
+            try:
+                jobs.put(None, timeout=0.1)
+                break
+            except queue.Full:
+                continue
         thread.join()
         while not results.empty():
             print(results.get_nowait(), flush=True)
