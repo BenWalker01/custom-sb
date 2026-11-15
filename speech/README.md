@@ -38,6 +38,23 @@ state is connected. Compare with and without hints, including misleading ones.
 Try `--beam 3` for explicit beam search, `--no-fallback` to disable temperature
 fallback, or `--backend auto` for the backend provided by your build.
 
+For callsigns, provide the spoken airline name and flight number as a hint:
+
+```sh
+python speech/stt.py --worker speech-build-cuda/bin/stt-worker \
+  --model ../whisper.cpp/models/ggml-medium.en-q5_0.bin \
+  --backend auto --no-fallback --callsign "Ryanair 12T"
+```
+
+Repeat `--callsign` for other aircraft. The prototype generates both numeric
+and phonetic variants such as "Ryanair 12 tango" and "Ryanair one two tango".
+Supply telephony names, not airline codes such as `RYR`; use `--prompt` for
+other names or unusual callsign formats. Hints bias Whisper but do not
+guarantee accuracy and can make it hear a callsign that was not spoken.
+Compare the same recording with and without hints, including misleading
+hints; there is no simulator-derived aircraft list yet. Long prompts may be
+truncated by Whisper, so keep the list short.
+
 ## Faster inference with a GPU
 
 The normal build and default `--backend cpu` use the CPU. To use an NVIDIA GPU,

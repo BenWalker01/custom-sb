@@ -5,6 +5,7 @@ from array import array
 from dataclasses import dataclass
 from pathlib import Path
 import queue
+import re
 import struct
 import subprocess
 import sys
@@ -16,6 +17,30 @@ import wave
 SAMPLE_RATE = 16000
 MAX_SAMPLES = 30 * SAMPLE_RATE
 MAX_PROMPT_BYTES = 16384
+DIGITS = "zero one two three four five six seven eight niner".split()
+PHONETIC = (
+    "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima "
+    "mike november oscar papa quebec romeo sierra tango uniform victor whiskey "
+    "x-ray yankee zulu"
+).split()
+
+
+def build_prompt(prompt, callsigns):
+    hints = [prompt.strip()] if prompt.strip() else []
+    for callsign in callsigns:
+        match = re.fullmatch(r"\s*(.+?)\s+([0-9]+)([A-Za-z]*)\s*", callsign)
+        if not match:
+            raise ValueError(f"callsign hint {callsign!r} must use a spoken name and flight number, e.g. 'Ryanair 12T'")
+        name, number, suffix = match.groups()
+        spoken_digits = " ".join(DIGITS[int(digit)] for digit in number)
+        spoken_suffix = " ".join(PHONETIC[ord(letter) - ord("A")] for letter in suffix.upper())
+        hints.append(f"{name} {number}{suffix.upper()}")
+        hints.append(" ".join(part for part in (name, number, spoken_suffix) if part))
+        hints.append(" ".join(part for part in (name, spoken_digits, spoken_suffix) if part))
+    result = ", ".join(dict.fromkeys(hints))
+    if len(result.encode("utf-8")) > MAX_PROMPT_BYTES:
+        raise ValueError("prompt exceeds 16384 UTF-8 bytes")
+    return result
 
 
 @dataclass(frozen=True)
@@ -270,6 +295,8 @@ def main(argv=None):
     parser.add_argument("--beam", type=int, choices=range(1, 11), default=1)
     parser.add_argument("--no-fallback", action="store_true")
     parser.add_argument("--prompt", default="", help="optional static context hint, not a grammar")
+    parser.add_argument("--callsign", action="append", default=[], metavar="NAME NUMBER",
+                        help="likely spoken callsign, e.g. 'Ryanair 12T'; repeat for other aircraft")
     parser.add_argument("--wav", help="transcribe an existing mono 16 kHz PCM16 WAV instead of microphone")
     parser.add_argument("--key", default="f8", help="pynput special key for PTT (default: f8)")
     parser.add_argument("--device", help="PortAudio input device name or numeric index")
@@ -280,8 +307,7 @@ def main(argv=None):
     if args.device and args.device.isdecimal():
         args.device = int(args.device)
     try:
-        if len(args.prompt.encode("utf-8")) > MAX_PROMPT_BYTES:
-            raise ValueError("prompt exceeds 16384 UTF-8 bytes")
+        args.prompt = build_prompt(args.prompt, args.callsign)
         if args.save_wav_dir and not Path(args.save_wav_dir).is_dir():
             raise ValueError("audio output directory must already exist")
         if args.wav and args.save_wav_dir:

@@ -9,7 +9,41 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from speech.stt import Capture, SAMPLE_RATE, WhisperWorker, load_wav, read_exact, run_microphone, save_wav
+from speech.stt import Capture, SAMPLE_RATE, WhisperWorker, build_prompt, load_wav, main, read_exact, run_microphone, save_wav
+
+
+class PromptTests(unittest.TestCase):
+    def test_callsign_hints_include_phonetic_and_numeric_variants(self):
+        prompt = build_prompt("flight level", ["Ryanair 12t", "Speedbird 090"])
+        self.assertEqual(
+            prompt,
+            "flight level, Ryanair 12T, Ryanair 12 tango, Ryanair one two tango, "
+            "Speedbird 090, Speedbird zero niner zero",
+        )
+
+    def test_invalid_or_oversized_hints_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "spoken name"):
+            build_prompt("", ["RYR12T"])
+        with self.assertRaisesRegex(ValueError, "16384"):
+            build_prompt("a" * 16385, [])
+
+    def test_cli_passes_hints_to_transcription(self):
+        pcm = struct.pack("<h", 123)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "audio.wav"
+            with wave.open(str(path), "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(SAMPLE_RATE)
+                wav.writeframes(pcm)
+            with patch("speech.stt.WhisperWorker") as worker, redirect_stdout(io.StringIO()):
+                worker.return_value.transcribe.return_value = "transcript"
+                result = main(["--worker", "worker", "--model", "model", "--wav", str(path),
+                               "--callsign", "Ryanair 12T"])
+                self.assertEqual(result, 0)
+                job = worker.return_value.transcribe.call_args.args[0]
+                self.assertIn("Ryanair one two tango", job.prompt)
+                self.assertEqual(job.pcm, pcm)
 
 
 class CaptureTests(unittest.TestCase):
