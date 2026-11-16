@@ -153,11 +153,11 @@ safe.
    their current behavior in tag mode. Keep admin commands separate.
 3. Validate complete arguments and aircraft state before mutation; avoid
    success-shaped responses from the current exception handlers. For a compound
-   transmission, keep complete recognized instructions before the first
-   unrecognized or invalid remainder, even if it might qualify an instruction.
-   Revalidate each before applying, report exactly what was applied and expose
-   the unparsed remainder. Do not guess the callsign or skip unknown words to
-   execute later instructions.
+   transmission, identify complete recognized instructions even after unknown
+   words. Report skipped spans and fuzzy matches, revalidate each before
+   applying, and report exactly what was applied. Skipped words may qualify
+   a recognized instruction, so results are not proof of what was intended.
+   Do not guess a callsign or missing values.
 4. Serialize incoming speech requests onto the simulation's state-owning
    execution path. Rework the blocking loop/wakeup and shared timer mutations
    as needed so command handling does not wait a full radar interval or race

@@ -12,13 +12,20 @@ and an `Utterance`, plus aircraft callsigns and an ICAO-prefix-to-spoken-name
 mapping supplied by the caller:
 
 ```python
-from speech.instructions import transcribe_instruction
+import json
+from speech.instructions import FixCatalogue, transcribe_instruction
 from speech.stt import WhisperWorker, load_wav
 
+with open("speech/test_fixes.json", encoding="utf-8") as file:
+    fixes = FixCatalogue(json.load(file))
 worker = WhisperWorker("path/to/stt-worker", "path/to/model.bin", backend="auto")
 try:
     job = load_wav("path/to/recording.wav", "")
-    result = transcribe_instruction(worker, job, ["RYR12T"], {"RYR": "Ryanair"})
+    result = transcribe_instruction(
+        worker, job, ["RYR12T"], {"RYR": "Ryanair"},
+        controllers={"LTC_N_CTR": "London Control"},
+        fixes=fixes,
+    )
     print(result)
 finally:
     worker.close()
@@ -30,43 +37,114 @@ conversion when a transcript is already available. For microphone users,
 `callback(job, text)` on the serial decoder thread; the callback can call
 `interpret_transcript`. It should hand off results quickly and must not mutate
 simulator state. A callback error stops decoding and is reported.
-`transcribe_instruction` copies the supplied aircraft and airline mappings
+`transcribe_instruction` copies the supplied aircraft, airline and controller mappings
 before inference; callers needing PTT-press context must capture that snapshot
 themselves before submitting the utterance.
 
-An optional `greetings=["London control hello"]` argument to either API permits
-that exact greeting between a callsign and an instruction. Greetings are not
-ignored by default, and unconfigured wording is rejected. Aircraft and spoken
+`speech/test_fixes.json` is a small test catalogue, not a complete navigation
+database. `FixCatalogue` builds a reusable local index of its identifiers and
+spoken aliases. Pass the same `fixes` object to `interpret_transcript` in a
+microphone callback too. For example, “direct LOGAN” resolves to `LOGAN`, and
+“direct Lambourne” resolves to `LAM`. An exact alias matching multiple identifiers
+is ambiguous. Approximate single-word matches are suggestions only: the result
+is `ambiguous`, `fix_candidates` contains possible identifiers, and there are
+no instructions to execute. The suggestions are bounded and may not include
+every plausible fix. This API does not provide a confirmation flow: a caller
+must ask the controller, then separately validate and interpret the response.
+Names with no match or suggestion remain unrecognized. Rebuild the catalogue
+when its context changes. Identifiers alone do not distinguish geographically duplicated fixes;
+the simulator must resolve and validate the actual fix against live aircraft
+and navigation data. The catalogue is not automatically loaded from the
+simulator or included in the Whisper prompt.
+
+An optional `controllers={"LTC_N_CTR": "London Control"}` argument to either
+API recognizes the spoken controller name after the aircraft and returns both
+the FSD callsign and normalized spoken name. An optional “hello” following a
+recognized controller is ignored. The identifier is only transcript-derived:
+it is not authenticated, and the host must not use it as session authority.
+If several supplied controllers share the same spoken name, the result is
+ambiguous. Without a matching mapping, a single-word name followed by
+“control” (such as “London control”) is retained as `controller_spoken` with
+`controller=None`; no FSD callsign is inferred. Other unmapped names are not
+recognized.
+
+After a recognized controller name, the exact transcription “had a climb
+flight level …” is treated as “climb flight level …”. This is a deliberate
+interpretation of a reported Whisper output, not proof that the controller
+issued a clearance: the same words could describe a past climb. This
+interpretation is exposed in the result's `warnings` field.
+
+An optional `greetings=["London control hello"]` argument still permits that
+exact greeting to be ignored, but does not produce a controller identifier.
+Unrecognized wording is reported. Aircraft and spoken
 airline names must still be supplied explicitly; for example, matching “Easy
 one two three tango” requires an aircraft such as `EZY123T` and a matching
 spoken name such as `{"EZY": "Easy"}`. This mapping is only an example of a
 transcript alias, not proof of what was spoken.
 
 The immutable `TranscriptResult` contains `utterance_id`, the unmodified
-`transcript`, `status`, `callsign`, `instructions`, `reason`, and `unparsed`.
+`transcript`, `status`, `identifiers`, `instructions`, `information`, `reason`,
+`unparsed`, `unrecognized`, `warnings`, and `fix_candidates`. `identifiers` contains `aircraft`, `controller`, and
+`controller_spoken`, each nullable. `result.callsign` remains a compatibility
+accessor for `identifiers.aircraft`, but is not a serialized field.
 Status is `proposed`, `partial`, `rejected`, or `ambiguous`; rejections and
-ambiguities contain no instructions. A `partial` result contains the complete
-recognized instructions before the first unsupported or invalid part, plus
-the normalized unparsed remainder and an explanatory reason. It does not skip
-over unknown words to find later commands. Each `Instruction` has an `action`,
-`value`, `direction`, `unit`, `comparison`, and `until`. Speed `comparison`
-is `at_most` for “or less”, `at_least` for “or greater”, or `None` for an
+ambiguities contain no instructions or information. A `partial` result contains
+recognized instructions and information plus normalized `unrecognized` spans
+and an explanatory reason. The decoder can skip unknown words and find later
+commands; `unparsed` joins those spans with ` ... ` for compatibility. Fuzzy
+word and airline-name matches are reported in `warnings`. Callsign numbers and
+suffixes are not fuzzily corrected. Each instruction has a `type` and `action`,
+and only fields applicable to that instruction. Direction instructions use
+`heading`, `direct`, or `resume_navigation`; altitude instructions use
+`flight_level` or `altitude`; speed instructions use `speed`. Existing ILS
+clearances have type `approach`. Direct instructions contain a `fix` identifier.
+For example:
+
+```json
+[
+  {"type": "direction", "action": "heading", "value": 80, "direction": null, "unit": "degrees"},
+  {"type": "altitude", "action": "flight_level", "value": 110, "direction": "climb",
+   "unit": "flight_level", "timing": "now", "target_altitude_feet": 11000},
+  {"type": "speed", "action": "speed", "value": 220, "direction": null, "unit": "knots",
+   "comparison": "or_less", "until": null}
+]
+```
+
+This is a breaking change to the previous uniform instruction structure.
+Speed `comparison`
+is `or_less` for “or less”, `or_greater` for “or greater”, or `None` for an
 exact speed; these limits are inclusive. Unspecified speed units mean knots.
 Mach values are decimal strings, such as `"0.78"`, to preserve their value.
 “Until 4 DME” sets `until` to `DmeTermination(distance_nm=4, reference="ils")`;
 it does not identify a particular runway or ILS facility. An ILS proposal with
 no spoken runway has `value=None`; it does not
-identify or authorize a runway. A “fly heading” instruction without a stated
+identify or authorize a runway. A heading instruction without a stated
 turn direction has `direction=None`; the API does not choose a turn direction.
-If the callsign is ambiguous or the first instruction cannot be understood,
-the result contains no instructions. A partial result can omit words that
-would have changed the meaning of its recognized prefix; it is not proof of
-the full intended instruction.
+Climb/descend instructions include `target_altitude_feet` (FL110 is 11000)
+while preserving the original flight-level versus altitude unit. `timing="now"`
+is retained when spoken. `information` holds non-command items such as
+`Information(kind="track_miles", value=25, unit="nautical_miles",
+reference="touchdown", readback_required=False)`. Track miles can also appear
+before an instruction or on their own; information must not be executed or
+included in a pilot readback. The distance is what the controller said, not
+an independently measured distance.
+If the callsign is ambiguous or no item can be understood, the result contains
+no instructions. Skipped words can change the meaning of a recognized
+instruction: for example, “after waypoint” makes an otherwise immediate climb
+conditional. A partial result is not proof of the intended instruction.
+
+The decoder uses bounded tokenization, scored candidate command spans and
+limited spelling similarity; it is not an LLM and does not have VICE's full
+grammar or phonetic matcher. Its scores are ranking heuristics, not calibrated
+confidence. Transcripts are limited to 128 tokens.
 
 The current deliberately restricted grammar accepts an exact supplied
 callsign followed by flight-level climb/descend (including `FL150`), altitude
-climb/descend in feet, left/right heading (including “left heading”), speed,
-and ILS clearance. For example: “Ryanair one
+climb/descend in feet, headings with or without a turn direction (including
+“heading 090”, “maintain heading 090” and “turn left heading 090”), direct to
+a supplied fix, resume own navigation (including “resume own navigation direct
+to Lambourne”), speed, and ILS clearance. “Resume main navigation” is treated as
+“resume own navigation” with a warning. For example: “Ryanair one
 two tango, turn right heading zero niner zero, descend flight level one two
 zero and speed 210 knots.” Speeds accept knots, `kt`, `kts`, and Mach values
 such as “Mach point seven eight” or “Mach .78 or greater”, optionally followed
